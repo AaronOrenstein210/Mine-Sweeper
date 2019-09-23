@@ -4,41 +4,68 @@ import pygame
 
 
 class Square:
-    def __init__(self, rect, is_bomb):
-        self.boundary = rect
+    def __init__(self, rect, coord):
         self.inside = rect.inflate(-(rect.width / 20), -(rect.height / 20))
-        self.is_bomb = is_bomb
+        self.is_bomb = False
+        self.is_flagged = False
+        self.is_clicked = False
+        self.val = -1
+        self.coord = coord
+
+    def reset(self):
+        self.is_bomb = False
         self.is_flagged = False
         self.is_clicked = False
         self.val = -1
 
-    def draw(self, display):
-        pygame.draw.rect(display, (0, 0, 0), self.boundary)
-        pygame.draw.rect(display, (128, 128, 128), self.inside)
-
-    def onClick(self, display, left, font):
-        color = (0, 0, 0)
-        if left:
-            # It wasn't a bomb, reveal its number
-            if not self.is_bomb:
-                color = (200, 200, 200)
-            # It was a bomb and wasn't flagged, game over
-            elif not self.is_flagged:
-                color = (255, 0, 0)
-            # No change
-            else:
-                color = (0, 0, 255)
-            self.is_clicked = True
-        # Toggle if it is flagged or not
-        else:
-            color = (0, 0, 255) if not self.is_flagged else (128, 128, 128)
-            self.is_flagged = not self.is_flagged
-        # Change the color
+    def draw(self, display, theme):
+        # Flagged = blue, bomb (not flagged) = red, clicked (number) = light grey,
+        # default = grey
+        color = (0, 0, 255) if self.is_flagged else (128, 128, 128) if not self.is_clicked \
+            else (255, 0, 0) if self.is_bomb else (200, 200, 200)
         pygame.draw.rect(display, color, self.inside)
-        # Reveal the number if successfully left clicked
-        if color is (200, 200, 200):
-            text = font.render(str(self.val), 1, (0, 0, 0))
+        # Figure out foreground images
+        if self.is_flagged or (self.is_bomb and self.is_clicked):
+            img = theme.flag_img if self.is_flagged else theme.bomb_img
+            display.blit(getImg(img, (self.inside.width, self.inside.height)),
+                         (self.inside.left, self.inside.top))
+        elif self.is_clicked:
+            color = (0, 0, 128) if self.val == 1 else (0, 128, 0) if self.val == 2 \
+                else (128, 0, 0) if self.val == 3 else (128, 0, 128) if self.val == 4 \
+                else (200, 0, 128) if self.val == 5 else (0, 100, 128) if self.val == 6 \
+                else (10, 0, 10) if self.val == 7 else (200, 200, 200)
+            text = theme.font.render(str(self.val), 1, color)
             text_rect = text.get_rect(center=(self.inside.centerx, self.inside.centery))
             display.blit(text, text_rect)
-        # Return if we activated a bomb or not
-        return color is (255, 0, 0)
+
+    def reveal(self, display, theme):
+        if self.is_bomb:
+            pygame.draw.rect(display, (255, 0, 0), self.inside)
+            img = theme.flag_img if self.is_flagged else theme.bomb_img
+            display.blit(getImg(img, (self.inside.width, self.inside.height)),
+                         (self.inside.left, self.inside.top))
+
+    # Perform left click
+    def leftClick(self, display, theme):
+        self.is_clicked = True
+
+        self.draw(display, theme)
+
+        if self.is_bomb:
+            pygame.mixer.music.load("bomb_sound.mp3")
+            pygame.mixer.music.play()
+
+        # Return true if we clicked a bomb
+        return self.is_bomb
+
+    # Perform right click
+    def rightClick(self, display, theme):
+        self.is_flagged = not self.is_flagged
+
+        self.draw(display, theme)
+
+
+# Return scaled img
+def getImg(name, dim):
+    img = pygame.image.load(name)
+    return pygame.transform.scale(img, dim)
